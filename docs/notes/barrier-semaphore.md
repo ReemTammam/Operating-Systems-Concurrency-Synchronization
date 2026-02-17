@@ -20,103 +20,53 @@ a synchronization point before any are allowed to proceed.
 
 
 
-\## Example Code
+\## Example Code in java
 
 
-
-```java
 
 import java.util.concurrent.Semaphore;
 
-
-
 public class Main {
-
-&nbsp;   public static void main(String\[] args) {
-
-&nbsp;       for (int i = 0; i < 5; i++) {
-
-&nbsp;           TestThread t = new TestThread(i);
-
-&nbsp;           t.start();
-
-&nbsp;       }
-
-&nbsp;   }
-
+    public static void main(String[] args) {
+        for (int i = 0; i < 5; i++) {
+            TestThread t = new TestThread(i);
+            t.start();
+        }
+    }
 }
-
-
 
 class TestThread extends Thread {
 
+    static Semaphore barrierSem = new Semaphore(0);
+    static Semaphore countMutex = new Semaphore(1);
+    static int count = 0;
 
+    int tID;
 
-&nbsp;   static Semaphore barrierSem = new Semaphore(0);
+    public TestThread(int id) {
+        tID = id;
+    }
 
-&nbsp;   static Semaphore countMutex = new Semaphore(1);
+    @Override
+    public void run() {
 
-&nbsp;   static int count = 0;
+        // update the count of threads that have started
+        countMutex.acquireUninterruptibly();
+        count++;
 
+        // if this thread is the final one to arrive, release the barrier permits
+        if (count == 5) {
+            System.out.println("Thread " + tID +
+                    " is the last thread to arrive and will open the barrier.");
+            barrierSem.release(5);
+        } else {
+            System.out.println("Thread " + tID +
+                    " has arrived and is waiting for the barrier to be opened.");
+        }
 
+        countMutex.release();
 
-&nbsp;   int tID;
-
-
-
-&nbsp;   public TestThread(int id) {
-
-&nbsp;       tID = id;
-
-&nbsp;   }
-
-
-
-&nbsp;   @Override
-
-&nbsp;   public void run() {
-
-
-
-&nbsp;       // update the count of threads that have started
-
-&nbsp;       countMutex.acquireUninterruptibly();
-
-&nbsp;       count++;
-
-
-
-&nbsp;       // if this thread is the final one to arrive, release the barrier permits
-
-&nbsp;       if (count == 5) {
-
-&nbsp;           System.out.println("Thread " + tID +
-
-&nbsp;                   " is the last thread to arrive and will open the barrier.");
-
-&nbsp;           barrierSem.release(5);
-
-&nbsp;       } else {
-
-&nbsp;           System.out.println("Thread " + tID +
-
-&nbsp;                   " has arrived and is waiting for the barrier to be opened.");
-
-&nbsp;       }
-
-
-
-&nbsp;       countMutex.release();
-
-
-
-&nbsp;       barrierSem.acquireUninterruptibly();
-
-&nbsp;       System.out.println("Thread " + tID + " made it past the barrier!");
-
-&nbsp;   }
-
+        barrierSem.acquireUninterruptibly();
+        System.out.println("Thread " + tID + " made it past the barrier!");
+    }
 }
-
-
-

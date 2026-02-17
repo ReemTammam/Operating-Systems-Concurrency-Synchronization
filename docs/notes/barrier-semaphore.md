@@ -20,10 +20,9 @@ a synchronization point before any are allowed to proceed.
 
 
 
-\## Example Code in java
+## Example Code in Java
 
-
-
+```java
 import java.util.concurrent.Semaphore;
 
 public class Main {
@@ -70,3 +69,4 @@ class TestThread extends Thread {
         System.out.println("Thread " + tID + " made it past the barrier!");
     }
 }
+```

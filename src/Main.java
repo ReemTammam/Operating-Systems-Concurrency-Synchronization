@@ -96,6 +96,8 @@ public class Main {
 class Philosopher extends Thread {
 
     int id;
+    int meal = Main.M;
+    Semaphore[] chopstick = Main.chopsticks;
 
     public Philosopher(int id) {
        this.id = id;
@@ -108,6 +110,28 @@ class Philosopher extends Thread {
         System.out.println("Philosopher " + id + " sits down at the table.");
 
         // placeholder for dining logic
+        //making sure there's still meals left
+        if(meal> 0){
+            //seeing if both chopsticks are available
+            int cs1 = chopstick[id].getQueueLength();
+            int cs2;
+
+            if((id + 1) >Main.P){
+                int newId = (id+1)%Main.P;
+                cs2 = chopstick[newId].getQueueLength();
+            }
+            else{
+                cs2 = chopstick[id +1].getQueueLength();
+            }
+
+            if(cs1 > 0 && cs2 >0){
+                cs1 --;
+                cs2 --;
+                meal --;
+            }
+
+
+        }
         Thread.yield();
 
         Main.awaitEndBarrier(id);

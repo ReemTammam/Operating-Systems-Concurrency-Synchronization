@@ -1,2 +1,15 @@
-bin/
+# Java
 *.class
+bin/
+
+# IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/

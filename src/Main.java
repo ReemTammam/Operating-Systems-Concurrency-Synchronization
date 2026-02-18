@@ -12,6 +12,11 @@ public class Main {
     static Semaphore startCountMutex = new Semaphore(1);
     static int startCount = 0;
 
+    //ens semaphore barrier
+    static Semaphore endBarrier;
+    static Semaphore endCountMutex = new Semaphore(1);
+    static int endCount = 0;
+
     public static void main(String[] args) {
         //prompt user for P and M
         Scanner scanner = new Scanner(System.in);
@@ -49,6 +54,9 @@ public class Main {
         //create starting barrier
         startBarrier = new Semaphore(0);
 
+        //create ending barrier
+        endBarrier = new Semaphore(0);
+
         //start philosopher threads
         for (int i = 0; i < P; i++) {
             Philosopher t = new Philosopher(i);
@@ -69,6 +77,21 @@ public class Main {
         startCountMutex.release();
         startBarrier.acquireUninterruptibly();
     }
+
+    static void awaitEndBarrier(int id) {
+        endCountMutex.acquireUninterruptibly();
+        endCount++;
+        if (endCount == P) {
+            System.out.println("Philosopher " + id + " is last to finish. Opening end barrier.");
+            endBarrier.release(P);
+        } else {
+            System.out.println("Philosopher " + id + " finished and is waiting to leave.");
+        }
+        endCountMutex.release();
+        endBarrier.acquireUninterruptibly();
+    }
+
+
 }
 class Philosopher extends Thread {
 
@@ -80,7 +103,15 @@ class Philosopher extends Thread {
 
     @Override
     public void run(){
-        Main.awaitStartBarrier(id); // start barrier all must enter before anyone sits
-        System.out.println("Thread " + id + " made it past the barrier!");
+        Main.awaitStartBarrier(id);
+
+        System.out.println("Philosopher " + id + " sits down at the table.");
+
+        // placeholder for dining logic
+        Thread.yield();
+
+        Main.awaitEndBarrier(id);
+
+        System.out.println("Philosopher " + id + " leaves the table.");
     }
 }

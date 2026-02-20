@@ -69,10 +69,10 @@ public class Main {
         startCountMutex.acquireUninterruptibly();
         startCount++;
         if (startCount == P) {
-            System.out.println("Philosopher " + id + " is last to arrive. Opening start barrier.");
+            System.out.println("Philosopher " + (id + 1) + " is last to arrive. Opening start barrier.");
             startBarrier.release(P);
         } else {
-            System.out.println("Philosopher " + id + " arrived; waiting at start barrier.");
+            System.out.println("Philosopher " + (id + 1) + " arrived; waiting at start barrier.");
         }
         startCountMutex.release();
         startBarrier.acquireUninterruptibly();
@@ -82,10 +82,10 @@ public class Main {
         endCountMutex.acquireUninterruptibly();
         endCount++;
         if (endCount == P) {
-            System.out.println("Philosopher " + id + " is last to finish. Opening end barrier.");
+            System.out.println("Philosopher " + (id + 1) + " is last to finish. Opening end barrier.");
             endBarrier.release(P);
         } else {
-            System.out.println("Philosopher " + id + " finished and is waiting to leave.");
+            System.out.println("Philosopher " + (id + 1) + " finished and is waiting to leave.");
         }
         endCountMutex.release();
         endBarrier.acquireUninterruptibly();
@@ -96,7 +96,6 @@ public class Main {
 class Philosopher extends Thread {
 
     int id;
-    int meal = Main.M;
     Semaphore[] chopstick = Main.chopsticks;
 
     public Philosopher(int id) {
@@ -107,35 +106,71 @@ class Philosopher extends Thread {
     public void run(){
         Main.awaitStartBarrier(id);
 
-        System.out.println("Philosopher " + id + " sits down at the table.");
+        System.out.println("Philosopher " + (id +1) + " sits down at the table.");
 
         // placeholder for dining logic
         //making sure there's still meals left
-        if(meal> 0){
+        Thread.yield();
+        Thread.yield();
+        while(Main.M > 0){
+            try{
             //seeing if both chopsticks are available
-            int cs1 = chopstick[id].getQueueLength();
-            int cs2;
+            Semaphore cs1 = chopstick[id];
+            Semaphore cs2;
 
-            if((id + 1) >Main.P){
-                int newId = (id+1)%Main.P;
-                cs2 = chopstick[newId].getQueueLength();
+                if (!((id + 1) < Main.P)) {
+                    int newId = ((id + 1) % Main.P);
+                    cs2 = chopstick[newId];
+                } else {
+                    cs2 = chopstick[id + 1];
+                }
+
+                if (cs1.availablePermits() != 0 && cs2.availablePermits() != 0) {
+
+                    //getting the chopsticks to eat
+                    cs1.acquire();
+                    cs2.acquire();
+                    Thread.yield();
+                    Thread.yield();
+                    if(Main.M > 0) {
+                        System.out.println("Philosopher " + (id +1) + " is eating");
+                        Main.M--;
+                        Thread.yield();
+                        Thread.yield();
+                        Thread.yield();
+                        Thread.yield();
+
+                        //Philosopher finished eating releasing the chopsticks
+                        System.out.println("Philosopher " + (id + 1) + " is finished eating and is thinking");
+
+                        cs1.release();
+                        cs2.release();
+                        for(int i =0; i < 6; i++) {
+                            Thread.yield();
+                            Thread.yield();
+                            Thread.yield();
+                            Thread.yield();
+                        }
+                    }
+
+
+                }
+
             }
-            else{
-                cs2 = chopstick[id +1].getQueueLength();
+            catch(InterruptedException e){
+                throw new RuntimeException(e);
             }
 
-            if(cs1 > 0 && cs2 >0){
-                cs1 --;
-                cs2 --;
-                meal --;
-            }
+
 
 
         }
+
         Thread.yield();
 
         Main.awaitEndBarrier(id);
 
-        System.out.println("Philosopher " + id + " leaves the table.");
+        System.out.println("Philosopher " + (id + 1) + " leaves the table.");
+
     }
 }

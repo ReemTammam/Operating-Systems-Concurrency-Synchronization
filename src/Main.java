@@ -2,175 +2,130 @@ import java.util.Scanner;
 import java.util.concurrent.Semaphore;
 
 public class Main {
-    //shared variables
-    static int P;           //number of philosophers
-    static int M;           //number of meals
-    static Semaphore[] chopsticks;  //chopsticks are an array of semaphores
+    // Shared variables
+    static int P;                    // number of philosophers
+    static int M;                    // total meals (shared)
+    static Semaphore[] chopsticks;   // chopsticks array of semaphores
 
-    //start semaphore barrier
+    // Start barrier (enter together)
     static Semaphore startBarrier;
     static Semaphore startCountMutex = new Semaphore(1);
     static int startCount = 0;
 
-    //ens semaphore barrier
+    // End barrier (leave together)
     static Semaphore endBarrier;
     static Semaphore endCountMutex = new Semaphore(1);
     static int endCount = 0;
 
     public static void main(String[] args) {
-        //prompt user for P and M
+        // Prompt user for P and M
         Scanner scanner = new Scanner(System.in);
         System.out.print("Enter total number of philosophers: ");
         P = scanner.nextInt();
-        System.out.print("Enter total number of meals : ");
+        System.out.print("Enter total number of meals: ");
         M = scanner.nextInt();
-
         scanner.close();
 
-
-        //input guards
+        // Input guards
         if (P < 1) {
             System.out.println("Error: Number of philosophers must be at least 1.");
             return;
         }
-
         if (M < 0) {
             System.out.println("Error: Number of meals cannot be negative.");
             return;
         }
-
         // Q&A edge case
         if (P == 1 && M > 0) {
             System.out.println("Error: A single philosopher cannot eat because two chopsticks are required.");
             return;
         }
 
-        //create chopsticks
+        // Create chopsticks
         chopsticks = new Semaphore[P];
         for (int i = 0; i < P; i++) {
             chopsticks[i] = new Semaphore(1);
         }
 
-        //create starting barrier
+        // Create barriers
         startBarrier = new Semaphore(0);
-
-        //create ending barrier
         endBarrier = new Semaphore(0);
 
-        //start philosopher threads
+        // Start philosopher threads (store them so we can join later if needed)
+        Philosopher[] philosophers = new Philosopher[P];
         for (int i = 0; i < P; i++) {
-            Philosopher t = new Philosopher(i);
-            t.start();
+            philosophers[i] = new Philosopher(i);
+            philosophers[i].start();
         }
+
+        // (Optional for later) Join threads so main waits for completion.
+        // We'll enable this when we start timing runtime for the report.
+        /*
+        for (int i = 0; i < P; i++) {
+            try {
+                philosophers[i].join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        */
     }
 
-    //a barrier to ensure all threads enter together
+    // Barrier to ensure all threads enter together
     static void awaitStartBarrier(int id) {
         startCountMutex.acquireUninterruptibly();
         startCount++;
+
         if (startCount == P) {
-            System.out.println("Philosopher " + (id + 1) + " is last to arrive. Opening start barrier.");
+            System.out.println("Philosopher " + id + " is last to arrive. Opening start barrier.");
             startBarrier.release(P);
         } else {
-            System.out.println("Philosopher " + (id + 1) + " arrived; waiting at start barrier.");
+            System.out.println("Philosopher " + id + " arrived; waiting at start barrier.");
         }
+
         startCountMutex.release();
         startBarrier.acquireUninterruptibly();
     }
 
+    // Barrier to ensure all threads leave together
     static void awaitEndBarrier(int id) {
         endCountMutex.acquireUninterruptibly();
         endCount++;
+
         if (endCount == P) {
-            System.out.println("Philosopher " + (id + 1) + " is last to finish. Opening end barrier.");
+            System.out.println("Philosopher " + id + " is last to finish. Opening end barrier.");
             endBarrier.release(P);
         } else {
-            System.out.println("Philosopher " + (id + 1) + " finished and is waiting to leave.");
+            System.out.println("Philosopher " + id + " finished and is waiting to leave.");
         }
+
         endCountMutex.release();
         endBarrier.acquireUninterruptibly();
     }
-
-
 }
+
 class Philosopher extends Thread {
+    private final int id;
 
-    int id;
-    Semaphore[] chopstick = Main.chopsticks;
-
-    public Philosopher(int id) {
-       this.id = id;
+    Philosopher(int id) {
+        this.id = id;
     }
 
     @Override
-    public void run(){
+    public void run() {
+        // Etiquette: everyone enters together
         Main.awaitStartBarrier(id);
 
-        System.out.println("Philosopher " + (id +1) + " sits down at the table.");
+        // Step 1 output (required by spec)
+        System.out.println("Philosopher " + id + " sits down at the table. (Step 1)");
 
-        // placeholder for dining logic
-        //making sure there's still meals left
-        Thread.yield();
-        Thread.yield();
-        while(Main.M > 0){
-            try{
-            //seeing if both chopsticks are available
-            Semaphore cs1 = chopstick[id];
-            Semaphore cs2;
-
-                if (!((id + 1) < Main.P)) {
-                    int newId = ((id + 1) % Main.P);
-                    cs2 = chopstick[newId];
-                } else {
-                    cs2 = chopstick[id + 1];
-                }
-
-                if (cs1.availablePermits() != 0 && cs2.availablePermits() != 0) {
-
-                    //getting the chopsticks to eat
-                    cs1.acquire();
-                    cs2.acquire();
-                    Thread.yield();
-                    Thread.yield();
-                    if(Main.M > 0) {
-                        System.out.println("Philosopher " + (id +1) + " is eating");
-                        Main.M--;
-                        Thread.yield();
-                        Thread.yield();
-                        Thread.yield();
-                        Thread.yield();
-
-                        //Philosopher finished eating releasing the chopsticks
-                        System.out.println("Philosopher " + (id + 1) + " is finished eating and is thinking");
-
-                        cs1.release();
-                        cs2.release();
-                        for(int i =0; i < 6; i++) {
-                            Thread.yield();
-                            Thread.yield();
-                            Thread.yield();
-                            Thread.yield();
-                        }
-                    }
-
-
-                }
-
-            }
-            catch(InterruptedException e){
-                throw new RuntimeException(e);
-            }
-
-
-
-
-        }
-
+        // Placeholder for dining logic (Steps 2–10 will be added next)
         Thread.yield();
 
+        // Etiquette: everyone leaves together
         Main.awaitEndBarrier(id);
 
-        System.out.println("Philosopher " + (id + 1) + " leaves the table.");
-
+        // Step 11 output (required by spec)
+        System.out.println("Philosopher " + id + " leaves the table. (Step 11)");
     }
 }

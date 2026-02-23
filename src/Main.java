@@ -1,11 +1,22 @@
+import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.Semaphore;
 
 public class Main {
     // Shared variables
     static int P;                    // number of philosophers
-    static int M;                    // total meals (shared)
+    static int M;                    // total meals to be eaten (shared)
+    static int mealsRemaining;       // protected by mealsMutex
+    static int totalMealsEaten = 0;  // protected by mealsMutex
+
     static Semaphore[] chopsticks;   // chopsticks array of semaphores
+
+    // Protect shared meal counters
+    static Semaphore mealsMutex = new Semaphore(1);
+
+    // Deadlock prevention (semaphore-only)
+    // At most P-1 philosophers can attempt to pick up chopsticks simultaneously.
+    static Semaphore room;
 
     // Start barrier (enter together)
     static Semaphore startBarrier;
@@ -35,11 +46,12 @@ public class Main {
             System.out.println("Error: Number of meals cannot be negative.");
             return;
         }
-        // Q&A edge case
         if (P == 1 && M > 0) {
             System.out.println("Error: A single philosopher cannot eat because two chopsticks are required.");
             return;
         }
+
+        mealsRemaining = M;
 
         // Create chopsticks
         chopsticks = new Semaphore[P];
@@ -51,16 +63,17 @@ public class Main {
         startBarrier = new Semaphore(0);
         endBarrier = new Semaphore(0);
 
-        // Start philosopher threads (store them so we can join later if needed)
+        // Deadlock prevention semaphore
+        // If P == 1 we already returned when M>0; but allow P==1, M==0 without room usage.
+        room = new Semaphore(Math.max(P - 1, 1));
+
         Philosopher[] philosophers = new Philosopher[P];
         for (int i = 0; i < P; i++) {
             philosophers[i] = new Philosopher(i);
             philosophers[i].start();
         }
 
-        // (Optional for later) Join threads so main waits for completion.
-        // We'll enable this when we start timing runtime for the report.
-        /*
+        // Wait for all threads so we can print final report
         for (int i = 0; i < P; i++) {
             try {
                 philosophers[i].join();
@@ -68,7 +81,13 @@ public class Main {
                 throw new RuntimeException(e);
             }
         }
-        */
+
+        // Final report
+        System.out.println("\n=== FINAL REPORT ===");
+        for (int i = 0; i < P; i++) {
+            System.out.println("Philosopher " + i + " ate " + philosophers[i].mealsEatenByMe + " meals.");
+        }
+        System.out.println("Total meals eaten = " + totalMealsEaten);
     }
 
     // Barrier to ensure all threads enter together
@@ -102,30 +121,120 @@ public class Main {
         endCountMutex.release();
         endBarrier.acquireUninterruptibly();
     }
+
+    static int leftChopstick(int id) {
+        return id;
+    }
+
+    static int rightChopstick(int id) {
+        return (id + 1) % P;
+    }
+
+    static int randomCycles(Random r) {
+        // 3–6 cycles inclusive
+        return 3 + r.nextInt(4);
+    }
+
+    static void doCycles(int cycles) {
+        for (int i = 0; i < cycles; i++) {
+            Thread.yield();
+        }
+    }
 }
 
 class Philosopher extends Thread {
     private final int id;
+    int mealsEatenByMe = 0;
+
+    private final Random rng;
 
     Philosopher(int id) {
         this.id = id;
+        this.rng = new Random(System.nanoTime() + id);
     }
 
     @Override
     public void run() {
-        // Etiquette: everyone enters together
+        // Etiquette: enter together
         Main.awaitStartBarrier(id);
 
-        // Step 1 output (required by spec)
+        // Step 1
         System.out.println("Philosopher " + id + " sits down at the table. (Step 1)");
 
-        // Placeholder for dining logic (Steps 2–10 will be added next)
-        Thread.yield();
+        while (true) {
+            // If no meals remain, stop trying to eat (they may proceed to leave normally)
+            Main.mealsMutex.acquireUninterruptibly();
+            boolean done = (Main.mealsRemaining <= 0);
+            Main.mealsMutex.release();
+            if (done) break;
 
-        // Etiquette: everyone leaves together
+            int left = Main.leftChopstick(id);
+            int right = Main.rightChopstick(id);
+
+            // Deadlock prevention: limit contenders
+            Main.room.acquireUninterruptibly();
+
+            // Step 2: Pick up left chopstick (blocks if unavailable)
+            Main.chopsticks[left].acquireUninterruptibly();
+            System.out.println("Philosopher " + id + " picked up LEFT chopstick " + left
+                    + ". (Step 2) Meals eaten so far=" + Main.totalMealsEaten);
+
+            // Step 3: Pick up right chopstick (blocks if unavailable)
+            Main.chopsticks[right].acquireUninterruptibly();
+            System.out.println("Philosopher " + id + " picked up RIGHT chopstick " + right
+                    + ". (Step 3) Meals eaten so far=" + Main.totalMealsEaten);
+
+            // Now decide if we can actually eat a meal (protect shared meal counter)
+            boolean willEat;
+            Main.mealsMutex.acquireUninterruptibly();
+            if (Main.mealsRemaining > 0) {
+                Main.mealsRemaining--;
+                Main.totalMealsEaten++;
+                mealsEatenByMe++;
+                willEat = true;
+            } else {
+                willEat = false;
+            }
+            int eatenSoFarSnapshot = Main.totalMealsEaten;
+            int remainingSnapshot = Main.mealsRemaining;
+            Main.mealsMutex.release();
+
+            if (willEat) {
+                // Step 4: Begin eating
+                System.out.println("Philosopher " + id + " begins EATING. (Step 4) TotalEaten="
+                        + eatenSoFarSnapshot + " Remaining=" + remainingSnapshot);
+
+                // Step 5: Eat 3–6 cycles
+                Main.doCycles(Main.randomCycles(rng));
+            }
+
+            // Step 6: Put down left chopstick
+            Main.chopsticks[left].release();
+            System.out.println("Philosopher " + id + " put down LEFT chopstick " + left
+                    + ". (Step 6) TotalEaten=" + eatenSoFarSnapshot);
+
+            // Step 7: Put down right chopstick
+            Main.chopsticks[right].release();
+            System.out.println("Philosopher " + id + " put down RIGHT chopstick " + right
+                    + ". (Step 7) TotalEaten=" + eatenSoFarSnapshot);
+
+            // Allow another philosopher to attempt pickup
+            Main.room.release();
+
+            // Step 8: Begin thinking
+            System.out.println("Philosopher " + id + " begins THINKING. (Step 8) TotalEaten="
+                    + eatenSoFarSnapshot + " Remaining=" + remainingSnapshot);
+
+            // Step 9: Think 3–6 cycles
+            Main.doCycles(Main.randomCycles(rng));
+
+            // Step 10 is the loop condition (handled at top)
+        }
+
+        // Etiquette: leave together
         Main.awaitEndBarrier(id);
 
-        // Step 11 output (required by spec)
+        // Step 11
         System.out.println("Philosopher " + id + " leaves the table. (Step 11)");
     }
 }

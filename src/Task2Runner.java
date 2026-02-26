@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 public class Task2Runner {
@@ -14,7 +16,8 @@ public class Task2Runner {
         System.out.print("Max readers allowed at once (N)?: ");
         int N = input.nextInt();
 
-        input.close();
+        // DO NOT close System.in (keeps Task 1/2 usable in same program run)
+        // input.close();
 
         // Basic validation (TA-proof)
         if (R < 0 || W < 0) {
@@ -32,21 +35,39 @@ public class Task2Runner {
 
         ReadersWriters.init(R, W, N);
 
+        List<Thread> threads = new ArrayList<>();
+
         // Start reader threads
         for (int i = 0; i < R; i++) {
-            new Thread(new ReadersWriters.Readers(i)).start();
+            Thread t = new Thread(new ReadersWriters.Readers(i));
+            threads.add(t);
+            t.start();
         }
 
         // Start writer threads
         for (int i = 0; i < W; i++) {
-            new Thread(new ReadersWriters.Writers(i)).start();
+            Thread t = new Thread(new ReadersWriters.Writers(i));
+            threads.add(t);
+            t.start();
         }
 
         // Start controller thread (enforces N readers -> 1 writer -> ...)
-        new Thread(ReadersWriters::controller).start();
+        Thread controller = new Thread(ReadersWriters::controller);
+        threads.add(controller);
+        controller.start();
+
+        // Wait for completion (prevents early termination / missing output)
+        for (Thread t : threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.out.println("Interrupted while waiting for Task 2 threads.");
+                return;
+            }
+        }
     }
 
-    // For testing Task 2 alone
     public static void main(String[] args) {
         runTask2();
     }

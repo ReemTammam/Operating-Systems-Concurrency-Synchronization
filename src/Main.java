@@ -29,6 +29,23 @@ public class Main {
     static int endCount = 0;
 
     public static void main(String[] args) {
+        // Task 3: Manual command-line parsing
+        if (args == null || args.length != 2 || !args[0].equals("-A")) {
+            System.out.println("Error: Invalid arguments.");
+            System.out.println("Usage: java Main -A 1   (Task 1: Dining Philosophers)");
+            System.out.println("       java Main -A 2   (Task 2: Readers-Writers)");
+            return;
+        }
+
+        if (args[1].equals("1")) {
+            runTask1();
+        } else if (args[1].equals("2")) {
+            Task2Runner.runTask2();
+        } else {
+            System.out.println("Error: Invalid task number. Valid options are 1 or 2.");
+        }
+    }
+    static void runTask1(){
         // Prompt user for P and M
         Scanner scanner = new Scanner(System.in);
 
@@ -71,8 +88,6 @@ public class Main {
                 break;
             }
         }
-
-        scanner.close();
 
         mealsRemaining = M;
 
@@ -123,7 +138,7 @@ public class Main {
         System.out.println("Runtime in milliseconds = " + runtimeMs);
     }
 
-    // Barrier to ensure all threads enter together
+    // Barrier to make sure all threads enter together
     static void awaitStartBarrier(int id) {
         startCountMutex.acquireUninterruptibly();
         startCount++;
@@ -164,7 +179,7 @@ public class Main {
     }
 
     static int randomCycles(Random r) {
-        // 3–6 cycles inclusive
+        // 3-6 cycles inclusive
         return 3 + r.nextInt(4);
     }
 
@@ -244,7 +259,7 @@ class Philosopher extends Thread {
                     System.out.println("Philosopher " + id + " begins EATING. (Step 4) TotalEaten="
                             + eatenSoFarSnapshot + " Remaining=" + remainingSnapshot);
 
-                    // Step 5: Eat 3–6 cycles
+                    // Step 5: Eat 3-6 cycles
                     Main.doCycles(Main.randomCycles(rng));
                 }
 
@@ -262,7 +277,7 @@ class Philosopher extends Thread {
                 System.out.println("Philosopher " + id + " begins THINKING. (Step 8) TotalEaten="
                         + eatenSoFarSnapshot + " Remaining=" + remainingSnapshot);
 
-                // Step 9: Think 3–6 cycles
+                // Step 9: Think 3-6 cycles
                 Main.doCycles(Main.randomCycles(rng));
 
                 // Step 10 is the loop condition (handled at top)
